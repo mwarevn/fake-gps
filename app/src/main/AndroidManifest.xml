@@ -45,10 +45,10 @@
         <meta-data
             android:name="com.google.android.geo.API_KEY"
             android:value="AIzaSyDJHl2fdyya0PuEY-LRFUZM71pijfZN6IE" />
+
         <meta-data
             android:name="com.maplibre.AccessToken"
             android:value="pk.eyJ1IjoiZGVsdGFjaGF0IiwiYSI6ImNqc3c1aWczMzBjejY0M28wZmU0a3cwMzMifQ.ZPTH9dFJaav06RAu4rTYHw" />
-
 
         <provider
             android:name="androidx.core.content.FileProvider"
