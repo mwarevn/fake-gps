@@ -26,7 +26,7 @@ sed -i '' "s/versionCode [0-9]*/versionCode $VERSION_CODE/" app/build.gradle
 
 # Build release APK for full flavor
 echo "Building release APK for full flavor..."
-./gradlew assembleFullRelease
+./gradlew assembleRelease
 
 # Check if build was successful
 if [ ! -f "app/build/outputs/apk/full/release/app-full-arm64-v8a-release.apk" ]; then

@@ -36,7 +36,6 @@ object PrefManager {
     private val pref: SharedPreferences by lazy {
         val prefsFile = "${BuildConfig.APPLICATION_ID}_prefs"
         try {
-            // Restore original working logic for Xposed compatibility
             gsApp.getSharedPreferences(prefsFile, Context.MODE_WORLD_READABLE)
         } catch (e: SecurityException) {
             gsApp.getSharedPreferences(prefsFile, Context.MODE_PRIVATE)
@@ -90,6 +89,7 @@ object PrefManager {
         get() = pref.getInt(DARK_THEME, AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM)
         set(value) { pref.edit().putInt(DARK_THEME, value).apply() }
 
+    // FIXED: Default to FALSE so update is ENABLED by default
     var isUpdateDisabled: Boolean
         get() = pref.getBoolean(DISABLE_UPDATE, false)
         set(value) { pref.edit().putBoolean(DISABLE_UPDATE, value).apply() }
@@ -122,7 +122,7 @@ object PrefManager {
                 putFloat(BEARING, bearing)
                 putFloat(SPEED, speed)
                 putBoolean(START, start)
-            }.commit() // Use commit inside background for reliability
+            }.commit()
             fixPermissions()
         }
     }

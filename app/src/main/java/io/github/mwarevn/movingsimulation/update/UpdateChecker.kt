@@ -20,8 +20,11 @@ class UpdateChecker @Inject constructor(private val apiResponse : GitHubService)
         withContext(Dispatchers.IO){
             getReleaseList()?.let { gitHubReleaseResponse ->
                 val currentTag = gitHubReleaseResponse.tagName
+                val latestVersion = currentTag?.replace("v", "") ?: ""
+                val currentVersion = BuildConfig.TAG_NAME
 
-                if (currentTag != null && (currentTag != "v" + BuildConfig.TAG_NAME && PrefManager.isUpdateDisabled)) {
+                // Check if update is enabled and version is different
+                if (currentTag != null && latestVersion != currentVersion && !PrefManager.isUpdateDisabled) {
                     //New update available!
                     val asset =
                         gitHubReleaseResponse.assets?.firstOrNull { it.name?.endsWith(".apk") == true }
@@ -29,18 +32,10 @@ class UpdateChecker @Inject constructor(private val apiResponse : GitHubService)
                         asset?.browserDownloadUrl?.replace("/download/", "/tag/")?.apply {
                             substring(0, lastIndexOf("/"))
                         }
-                    val name = gitHubReleaseResponse.name ?: run {
-                        this@callbackFlow.trySend(null).isSuccess
-                        return@let
-                    }
-                    val body = gitHubReleaseResponse.body ?: run {
-                        this@callbackFlow.trySend(null).isSuccess
-                        return@let
-                    }
-                    val publishedAt = gitHubReleaseResponse.publishedAt ?: run {
-                        this@callbackFlow.trySend(null).isSuccess
-                        return@let
-                    }
+                    val name = gitHubReleaseResponse.name ?: "Bản cập nhật mới"
+                    val body = gitHubReleaseResponse.body ?: "Vui lòng cập nhật để tiếp tục sử dụng ứng dụng."
+                    val publishedAt = gitHubReleaseResponse.publishedAt ?: ""
+                    
                     this@callbackFlow.trySend(
                         Update(
                             name,
@@ -52,6 +47,8 @@ class UpdateChecker @Inject constructor(private val apiResponse : GitHubService)
                             releaseUrl ?: "https://github.com/minhdevs/android-gps-moving-simulation/releases"
                         )
                     ).isSuccess
+                } else {
+                    this@callbackFlow.trySend(null).isSuccess
                 }
             } ?: run {
                 this@callbackFlow.trySend(null).isSuccess
@@ -81,4 +78,3 @@ class UpdateChecker @Inject constructor(private val apiResponse : GitHubService)
     data class Update(val name: String, val changelog: String, val timestamp: String, val assetUrl: String, val assetName: String, val releaseUrl: String):
         Parcelable
 }
-
