@@ -249,6 +249,14 @@ class MapActivity : BaseMapActivity() {
                         binding.routeLoadingCard.visibility = View.GONE
                         binding.actionButton.apply { text = "Bắt đầu"; setIconResource(R.drawable.ic_navigation); visibility = View.VISIBLE }
                         binding.cancelRouteButton.apply { text = "Huỷ"; visibility = View.VISIBLE }
+                    } else {
+                        // FIX: Nếu route trong ViewModel rỗng, đảm bảo xóa các nút và đường vẽ cũ
+                        routingPoints = emptyList()
+                        mapController.clearRoute()
+                        if (currentMode == AppMode.SEARCH) {
+                            binding.actionButton.visibility = View.GONE
+                            binding.cancelRouteButton.visibility = View.GONE
+                        }
                     }
                 }
             }
@@ -263,10 +271,7 @@ class MapActivity : BaseMapActivity() {
     override fun initializeMap() {
         val map = binding.root.findViewById<com.mapbox.maps.MapView>(R.id.mapView)
         mapView = map; mapboxMap = map.mapboxMap
-        
-        // Disable ScaleBar
         map.scalebar.enabled = false
-        
         val polylineAnnotationManager = map.annotations.createPolylineAnnotationManager()
         val pointAnnotationManager = map.annotations.createPointAnnotationManager()
         polylineAnnotationManager.lineCap = LineCap.ROUND; polylineAnnotationManager.lineJoin = LineJoin.ROUND
@@ -537,9 +542,14 @@ class MapActivity : BaseMapActivity() {
     private fun updateMarkersDraggableState() { val canDrag = currentMode != AppMode.NAVIGATION && !isDriving; mapController.setDestinationDraggable(canDrag); mapController.setStartDraggable(currentMode == AppMode.ROUTE_PLAN && canDrag) }
 
     private fun swapStartAndDestination() {
-        val sPos = currentStartPos ?: return; val dPos = currentDestPos ?: return; val sText = binding.startSearch.text.toString(); val dText = binding.destinationSearch.text.toString()
-        currentStartPos = dPos; currentDestPos = sPos; mapController.clearRoute(); mapController.setStartMarker(currentStartPos!!, false); mapController.setDestinationMarker(currentDestPos!!, false)
-        binding.startSearch.setText(dText); binding.destinationSearch.setText(sText); if (currentMode == AppMode.ROUTE_PLAN) drawRoute()
+        val sPos = currentStartPos ?: return; val dPos = currentDestPos ?: return
+        val sText = binding.startSearch.text.toString(); val dText = binding.destinationSearch.text.toString()
+        currentStartPos = dPos; currentDestPos = sPos
+        mapController.clearRoute()
+        mapController.setStartMarker(currentStartPos!!, true)
+        mapController.setDestinationMarker(currentDestPos!!, true)
+        binding.startSearch.setText(dText); binding.destinationSearch.setText(sText)
+        if (currentMode == AppMode.ROUTE_PLAN) { hasSelectedStartPoint = true; drawRoute() }
     }
 
     private fun drawRoute(showLoading: Boolean = true) {
@@ -553,6 +563,7 @@ class MapActivity : BaseMapActivity() {
 
     private fun cancelRoutePlan() {
         mapController.clearRoute(); mapController.clearStartMarker()
+        viewModel.clearRoute() // FIX: Clear ViewModel data on manual cancel
         binding.startSearch.text.clear(); binding.startSearchContainer.visibility = View.GONE; binding.useCurrentLocationContainer.visibility = View.GONE
         binding.routeLoadingCard.visibility = View.GONE; binding.routeErrorCard.visibility = View.GONE; currentMode = AppMode.SEARCH; hasSelectedStartPoint = false
         updateActionButtonsVisibility(); binding.searchCard.visibility = View.VISIBLE; updateSwapButtonVisibility()
@@ -622,12 +633,17 @@ class MapActivity : BaseMapActivity() {
     }
 
     private fun clearActiveNavigationData() {
+        // FIX: Xoá route khỏi ViewModel để không bị khôi phục lại khi resume app
+        viewModel.clearRoute()
+        routingPoints = emptyList()
+        
         mapController.clearRoute(); mapController.clearStartMarker(); mapController.clearDestinationMarker()
-        completedPathPoints.clear(); routingPoints = emptyList(); currentMode = AppMode.SEARCH; hasSelectedStartPoint = false
+        completedPathPoints.clear(); currentMode = AppMode.SEARCH; hasSelectedStartPoint = false
         currentStartPos = null; currentDestPos = null; currentNavigationPosition = null
         
         binding.actionButton.visibility = View.GONE; binding.navigationControlsCard.visibility = View.GONE; binding.cameraFollowToggle.visibility = View.GONE
         binding.completionActionsCard.visibility = View.GONE; binding.startSearchContainer.visibility = View.GONE; binding.useCurrentLocationContainer.visibility = View.GONE
+        binding.cancelRouteButton.visibility = View.GONE
         binding.destinationSearch.text.clear(); binding.startSearch.text.clear(); binding.searchCard.visibility = View.VISIBLE
         binding.addFavoriteButton.visibility = View.GONE; binding.routeLoadingCard.visibility = View.GONE; binding.routeErrorCard.visibility = View.GONE
         
