@@ -5,24 +5,11 @@ name: Generate APK
 
 env:
     main_project_module: app
-    target_owner: Xposed-Modules-Repo
-    target_repo: io.github.mwarevn.fakegps
-    target_path: target_path
 
 on:
     push:
         branches:
-            - "release/**"
-        tags:
-            - "v*.*.*"
-    workflow_dispatch:
-        inputs:
-            version:
-                description: "v*.*.*"
-                required: true
-                type: string
-    # schedule:
-    #   - cron: '0 0 1 */2 *'
+            - "prod"
 
 jobs:
     build:
@@ -30,15 +17,11 @@ jobs:
         steps:
             - uses: actions/checkout@v4
 
-            - name: Set TAG
-              if: github.event_name == 'push'
+            - name: Extract version from build.gradle
               run: |
-                  echo "version=$(echo '${{ github.ref_name }}' | awk -F 'v' '{print $2}')" >> $GITHUB_ENV
-
-            - name: Set TAG
-              if: github.event_name == 'workflow_dispatch'
-              run: |
-                  echo "version=$(echo '${{ inputs.version }}' | awk -F 'v' '{print $2}')" >> $GITHUB_ENV
+                  VERSION=$(grep "def tagName" app/build.gradle | sed "s/.*'\(.*\)'.*/\1/")
+                  echo "version=$VERSION" >> $GITHUB_ENV
+                  echo "Detected version: $VERSION"
 
             - name: Set ENV
               run: |
@@ -49,7 +32,7 @@ jobs:
               uses: actions/setup-java@v4
               with:
                   distribution: "zulu"
-                  java-version: "17" # 21
+                  java-version: "17"
                   cache: "gradle"
 
             - name: Build
@@ -60,12 +43,6 @@ jobs:
                   ./gradlew assembleRelease --stacktrace
                   rm upload.jks local.properties
 
-            # - name: Upload
-            #   uses: actions/upload-artifact@v4
-            #   with:
-            #     name: ${{ env.repository_name }} - ${{ env.date_today }}
-            #     path: ${{ env.main_project_module }}/build/outputs/apk/
-
             - name: Publish (GitHub)
               uses: softprops/action-gh-release@v2
               with:
@@ -73,83 +50,4 @@ jobs:
                   name: v${{ env.version }}
                   tag_name: v${{ env.version }}
                   files: |
-                      ${{ env.main_project_module }}/build/outputs/apk/foss/release/app-foss-arm64-v8a-release.apk
                       ${{ env.main_project_module }}/build/outputs/apk/full/release/app-full-arm64-v8a-release.apk
-
-            - name: Publish (Xposed)
-              uses: softprops/action-gh-release@v2
-              with:
-                  token: ${{ secrets.PAT }}
-                  repository: Xposed-Modules-Repo/io.github.mwarevn.fakegps
-                  name: v${{ env.version }}
-                  tag_name: v${{ env.version }}
-                  files: |
-                      ${{ env.main_project_module }}/build/outputs/apk/foss/release/app-foss-arm64-v8a-release.apk
-                      ${{ env.main_project_module }}/build/outputs/apk/full/release/app-full-arm64-v8a-release.apk
-
-            - name: Checkout
-              uses: actions/checkout@v4
-              with:
-                  repository: ${{ env.target_owner }}/${{ env.target_repo }}
-                  path: ${{ env.target_path }}
-                  token: ${{ secrets.PAT }}
-                  # sparse-checkout: |
-                  #     README.md
-                  # sparse-checkout-cone-mode: false
-
-            - name: Sync
-              run: |
-                  cd ${{ env.target_path }}
-                  cp ../README.md ../LICENSE .
-                  git config --global user.name 'github-actions[bot]'
-                  git config --global user.email 'github-actions[bot]@users.noreply.github.com'
-                  git add README.md
-                  git add LICENSE
-                  git commit --amend --no-edit
-                  git push --force
-
-            # - name: Get latest release
-            #   id: get_release
-            #   uses: actions/github-script@v6
-            #   with:
-            #     script: |
-            #       const latestRelease = await github.repos.getLatestRelease({
-            #       owner: ${{ env.owner }},
-            #       repo: ${{ env.repo }}
-            #       });
-            #       return latestRelease.data;
-
-            # - name: Download release assets
-            #   run: |
-            #     mkdir -p release-assets
-            #     for asset in $(jq -r '.assets[].browser_download_url' <<< "${{ steps.get_release.outputs.result }}"); do
-            #       filename=$(basename $asset)
-            #       curl -L -o release-assets/$filename $asset
-            #       if [[ $filename == app-foss*.apk ]]; then
-            #         echo "foss=$filename" >> $GITHUB_ENV
-            #       elif [[ $filename == app-full*.apk ]]; then
-            #         echo "full=$filename" >> $GITHUB_ENV
-            #       fi
-            #     done
-
-            # - name: Create a new release
-            #   id: create_release
-            #   uses: actions/create-release@v1
-            #   env:
-            #       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-            #   with:
-            #     tag_name: ${{ steps.get_release.outputs.result.tag_name }}
-            #     release_name: ${{ steps.get_release.outputs.result.name }}
-            #     body: ${{ steps.get_release.outputs.result.body }}
-            #     draft: false
-            #     prerelease: false
-
-            # - name: Publish
-            #   uses: actions/upload-release-asset@v1.0.1
-            #   env:
-            #       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-            #   with:
-            #     upload_url: ${{ steps.create_release.outputs.upload_url }}
-            #     asset_path: release-assets/${{ env.full }}
-            #     asset_name: ${{ env.full }}
-            #     asset_content_type: application/zip

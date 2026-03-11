@@ -1,6 +1,5 @@
 package io.github.mwarevn.fakegps.xposed
 
-import android.os.Build
 import android.provider.Settings
 import de.robv.android.xposed.XC_MethodHook
 import de.robv.android.xposed.XposedBridge
@@ -16,6 +15,9 @@ import io.github.mwarevn.fakegps.BuildConfig
  * - Bluetooth/BLE scan blocking (prevents location via BLE beacons)
  * - Cell tower info hiding (prevents location via cell towers)
  * - System settings spoofing (wifi_scan_always_enabled, ble_scan_always_enabled)
+ *
+ * All hooks are registered unconditionally at load time.
+ * isStarted and per-feature toggles are checked at RUNTIME inside each callback.
  */
 object NetworkHook {
 
@@ -25,9 +27,6 @@ object NetworkHook {
     fun initHooks(lpparam: XC_LoadPackage.LoadPackageParam) {
         if (lpparam.packageName == BuildConfig.APPLICATION_ID) return
         if (lpparam.packageName == "android") return
-
-        settings.reload()
-        if (!settings.isStarted) return
 
         try {
             hookWifiScan(lpparam)
@@ -54,6 +53,12 @@ object NetworkHook {
         }
     }
 
+    /** Check at runtime whether GPS spoofing is active */
+    private fun isActive(): Boolean {
+        settings.reload()
+        return settings.isStarted
+    }
+
     // ========== WiFi Scan Block ==========
 
     private fun hookWifiScan(lpparam: XC_LoadPackage.LoadPackageParam) {
@@ -64,8 +69,7 @@ object NetworkHook {
         // Block getScanResults() -> return empty list
         XposedHelpers.findAndHookMethod(wifiManagerClass, "getScanResults", object : XC_MethodHook() {
             override fun beforeHookedMethod(param: MethodHookParam) {
-                settings.reload()
-                if (settings.isStarted && settings.isNetworkSimEnabled) {
+                if (isActive() && settings.isNetworkSimEnabled) {
                     param.result = emptyList<Any>()
                 }
             }
@@ -75,8 +79,7 @@ object NetworkHook {
         try {
             XposedHelpers.findAndHookMethod(wifiManagerClass, "startScan", object : XC_MethodHook() {
                 override fun beforeHookedMethod(param: MethodHookParam) {
-                    settings.reload()
-                    if (settings.isStarted && settings.isNetworkSimEnabled) {
+                    if (isActive() && settings.isNetworkSimEnabled) {
                         param.result = false
                     }
                 }
@@ -97,8 +100,7 @@ object NetworkHook {
             try {
                 XposedHelpers.findAndHookMethod(btAdapterClass, "getBondedDevices", object : XC_MethodHook() {
                     override fun beforeHookedMethod(param: MethodHookParam) {
-                        settings.reload()
-                        if (settings.isStarted && settings.isBluetoothSpoofEnabled) {
+                        if (isActive() && settings.isBluetoothSpoofEnabled) {
                             param.result = emptySet<Any>()
                         }
                     }
@@ -115,8 +117,7 @@ object NetworkHook {
             try {
                 XposedBridge.hookAllMethods(bleScannerClass, "startScan", object : XC_MethodHook() {
                     override fun beforeHookedMethod(param: MethodHookParam) {
-                        settings.reload()
-                        if (settings.isStarted && settings.isBtScanSpoofEnabled) {
+                        if (isActive() && settings.isBtScanSpoofEnabled) {
                             param.result = null
                         }
                     }
@@ -136,8 +137,7 @@ object NetworkHook {
         try {
             XposedHelpers.findAndHookMethod(telephonyClass, "getCellLocation", object : XC_MethodHook() {
                 override fun beforeHookedMethod(param: MethodHookParam) {
-                    settings.reload()
-                    if (settings.isStarted && settings.isCellSpoofEnabled) {
+                    if (isActive() && settings.isCellSpoofEnabled) {
                         param.result = null
                     }
                 }
@@ -148,8 +148,7 @@ object NetworkHook {
         try {
             XposedHelpers.findAndHookMethod(telephonyClass, "getAllCellInfo", object : XC_MethodHook() {
                 override fun beforeHookedMethod(param: MethodHookParam) {
-                    settings.reload()
-                    if (settings.isStarted && settings.isCellSpoofEnabled) {
+                    if (isActive() && settings.isCellSpoofEnabled) {
                         param.result = emptyList<Any>()
                     }
                 }
@@ -160,8 +159,7 @@ object NetworkHook {
         try {
             XposedHelpers.findAndHookMethod(telephonyClass, "getNeighboringCellInfo", object : XC_MethodHook() {
                 override fun beforeHookedMethod(param: MethodHookParam) {
-                    settings.reload()
-                    if (settings.isStarted && settings.isCellSpoofEnabled) {
+                    if (isActive() && settings.isCellSpoofEnabled) {
                         param.result = emptyList<Any>()
                     }
                 }
@@ -176,8 +174,7 @@ object NetworkHook {
         try {
             XposedBridge.hookAllMethods(Settings.Global::class.java, "getInt", object : XC_MethodHook() {
                 override fun beforeHookedMethod(param: MethodHookParam) {
-                    settings.reload()
-                    if (!settings.isStarted) return
+                    if (!isActive()) return
 
                     val key = param.args.getOrNull(1) as? String ?: return
 

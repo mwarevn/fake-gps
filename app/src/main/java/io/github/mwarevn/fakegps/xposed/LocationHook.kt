@@ -93,6 +93,11 @@ object LocationHook {
         }
 
         if (ignorePkg.contains(lpparam.packageName)) return
+
+        // Khi global hook (system_hooked) đang bật, system server đã xử lý GPS cho toàn bộ app.
+        // Chỉ cần hook app-level GPS khi KHÔNG dùng global hook.
+        if (settings.isHookedSystem) return
+
         if (lpparam.packageName == "com.google.android.gms") hookGmsCore(lpparam)
         hookApplicationLevel(lpparam)
     }

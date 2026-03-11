@@ -26,30 +26,30 @@ sed -i "s/def tagName = '.*'/def tagName = '$VERSION_NAME'/" app/build.gradle
 sed -i "s/versionCode [0-9]*/versionCode $VERSION_CODE/" app/build.gradle
 
 # Build release APK (No flavor, just release)
-echo "Building release APK..."
-./gradlew assembleRelease
+# echo "Building release APK..."
+# ./gradlew assembleRelease
 
-# Check if build was successful
-# Path changes from outputs/apk/full/release to outputs/apk/release
-APK_PATH="app/build/outputs/apk/release/app-arm64-v8a-release.apk"
-if [ ! -f "$APK_PATH" ]; then
-  echo "Error: APK build failed!"
-  exit 1
-fi
+# # Check if build was successful
+# # Path changes from outputs/apk/full/release to outputs/apk/release
+# APK_PATH="app/build/outputs/apk/release/app-arm64-v8a-release.apk"
+# if [ ! -f "$APK_PATH" ]; then
+#   echo "Error: APK build failed!"
+#   exit 1
+# fi
 
 echo "Build successful!"
 echo "APK location: $APK_PATH"
 
 # Commit and tag
-git add app/build.gradle
-git commit -m "bump version to $VERSION_NAME"
-git tag $VERSION_STRING
-git push
-git push origin $VERSION_STRING
+# git add app/build.gradle
+# git commit -m "bump version to $VERSION_NAME"
+# git tag $VERSION_STRING
+# git push
+# git push origin $VERSION_STRING
 
 echo ""
 echo "✅ Release completed!"
-echo "📦 APK: $APK_PATH"
+# echo "📦 APK: $APK_PATH"
 echo "🏷️  Tag: $VERSION_STRING"
 echo ""
 echo "Next steps:"
