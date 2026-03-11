@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<com.google.android.material.card.MaterialCardView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    app:cardCornerRadius="16dp"
+    app:cardElevation="6dp"
+    app:cardBackgroundColor="?attr/colorError"
+    app:cardUseCompatPadding="false">
+
+    <LinearLayout
+        android:id="@+id/badge_container"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center"
+        android:paddingStart="8dp"
+        android:paddingEnd="12dp"
+        android:paddingTop="6dp"
+        android:paddingBottom="6dp">
+
+        <ImageView
+            android:id="@+id/traffic_icon"
+            android:layout_width="16dp"
+            android:layout_height="16dp"
+            android:src="@drawable/ic_traffic_light"
+            android:layout_marginEnd="6dp"/>
+
+        <TextView
+            android:id="@+id/traffic_label_text"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Đèn đỏ (Bỏ qua)"
+            android:textColor="?attr/colorOnError"
+            android:textSize="12sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+</com.google.android.material.card.MaterialCardView>

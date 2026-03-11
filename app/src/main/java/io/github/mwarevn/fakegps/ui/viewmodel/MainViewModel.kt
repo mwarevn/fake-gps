@@ -9,8 +9,10 @@ import android.content.IntentFilter
 import android.database.ContentObserver
 import android.database.Cursor
 import android.net.Uri
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.provider.Settings
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import androidx.lifecycle.LiveData
@@ -52,7 +54,7 @@ class MainViewModel @Inject constructor(
     private val downloadManager: DownloadManager,
     private val statusService: StatusService,
     private val calculateRouteUseCase: CalculateRouteUseCase,
-    @ApplicationContext context: Context
+    @ApplicationContext private val context: Context
 ) : ViewModel() {
 
     // FIX: Change these to dynamic getters so they always return fresh values from PrefManager
@@ -128,13 +130,17 @@ class MainViewModel @Inject constructor(
     }
 
 
-    private val _update = MutableStateFlow<UpdateChecker.Update?>(null).apply {
+    private val _update = MutableStateFlow<UpdateChecker.Update?>(null)
+
+    fun checkForUpdates() {
         viewModelScope.launch {
-            withContext(Dispatchers.IO){
-                checkUpdates.clearCachedDownloads(context)
-            }
             checkUpdates.getLatestRelease().collect {
-                emit(it)
+                if (it == null) {
+                    withContext(Dispatchers.IO){
+                        checkUpdates.clearCachedDownloads(context)
+                    }
+                }
+                _update.emit(it)
             }
         }
     }
@@ -198,9 +204,32 @@ class MainViewModel @Inject constructor(
 
     // Got idea from https://github.com/KieronQuinn/DarQ for Check Update
     fun startDownload(context: Context, update: UpdateChecker.Update) {
-        if(_downloadState.value is State.Idle) {
-            downloadUpdate(context, update.assetUrl, update.assetName)
+        if(_downloadState.value !is State.Idle) return
+
+        val downloadFolder = File(context.externalCacheDir, "updates")
+        val existingFile = File(downloadFolder, update.assetName)
+        
+        // Phase 16: Cache Reuse and Integrity Check
+        if (existingFile.exists()) {
+            val packageInfo = context.packageManager.getPackageArchiveInfo(existingFile.absolutePath, 0)
+            if (packageInfo != null) {
+                // The APK is cryptographically intact and fully downloaded.
+                val outputUri = FileProvider.getUriForFile(
+                    context, 
+                    BuildConfig.APPLICATION_ID + ".provider", 
+                    existingFile
+                )
+                viewModelScope.launch {
+                    _downloadState.emit(State.Done(outputUri))
+                }
+                return
+            } else {
+                // The APK is corrupt or partially downloaded
+                existingFile.delete()
+            }
         }
+        
+        downloadUpdate(context, update.assetUrl, update.assetName)
     }
 
     private val downloadStateReceiver = object: BroadcastReceiver() {
@@ -258,7 +287,7 @@ class MainViewModel @Inject constructor(
             context,
             downloadStateReceiver,
             IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE),
-            ContextCompat.RECEIVER_NOT_EXPORTED
+            ContextCompat.RECEIVER_EXPORTED
         )
         context.contentResolver.registerContentObserver(Uri.parse("content://downloads/my_downloads"), true, downloadObserver)
         requestId = DownloadManager.Request(Uri.parse(url)).apply {
@@ -271,6 +300,17 @@ class MainViewModel @Inject constructor(
     }
 
     fun openPackageInstaller(context: Context, uri: Uri){
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !context.packageManager.canRequestPackageInstalls()) {
+            context.startActivity(
+                Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES).apply {
+                    data = Uri.parse(String.format("package:%s", context.packageName))
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                }
+            )
+            context.showToast(context.getString(R.string.app_name) + " cần quyền cài đặt ứng dụng. Vui lòng cấp quyền và thử lại.")
+            return
+        }
+
         runCatching {
             Intent(Intent.ACTION_VIEW, uri).apply {
                 putExtra(Intent.EXTRA_NOT_UNKNOWN_SOURCE, true)

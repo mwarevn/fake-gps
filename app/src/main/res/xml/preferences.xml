@@ -35,7 +35,7 @@
             android:summary="@string/check_update_summary"
             android:icon="@drawable/ic_update"
             android:widgetLayout="@layout/preference_switch_widget"
-            android:key="disable_update"
+            android:key="check_update_enabled"
             android:defaultValue="false" />
 
         <!-- Anti-Detection Menu -->

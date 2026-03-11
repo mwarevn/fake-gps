@@ -43,7 +43,7 @@ class UpdateChecker @Inject constructor(private val apiResponse : GitHubService)
                             publishedAt,
                             asset?.browserDownloadUrl
                                 ?: "https://github.com/mwarevn/fake-gps/releases",
-                            asset?.name ?: "app-release.apk",
+                            asset?.name ?: "app-arm64-v8a-release.apk",
                             releaseUrl ?: "https://github.com/mwarevn/fake-gps/releases"
                         )
                     ).isSuccess

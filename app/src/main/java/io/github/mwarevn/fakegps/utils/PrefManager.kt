@@ -90,8 +90,12 @@ object PrefManager {
         set(value) { pref.edit().putBoolean(RANDOM_POSITION, value).commit(); fixPermissions() }
 
     var isUpdateDisabled: Boolean
-        get() = pref.getBoolean("disable_update", false)
-        set(value) { pref.edit().putBoolean("disable_update", value).commit(); fixPermissions() }
+        get() {
+            if (!BuildConfig.DEBUG) return false
+            val isCheckUpdateEnabled = pref.getBoolean("check_update_enabled", false)
+            return !isCheckUpdateEnabled
+        }
+        set(value) { pref.edit().putBoolean("check_update_enabled", !value).apply(); fixPermissions() }
 
     var accuracy: String?
         get() = pref.getString(ACCURACY_SETTING, "10")

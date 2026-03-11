@@ -7,7 +7,7 @@ import android.content.Intent
 import android.graphics.PixelFormat
 import android.os.IBinder
 import android.view.*
-// import io.github.controlwear.virtual.joystick.android.JoystickView
+import io.github.controlwear.virtual.joystick.android.JoystickView
 import io.github.mwarevn.fakegps.R
 import kotlin.math.cos
 import kotlin.math.sin
@@ -16,7 +16,7 @@ class JoystickService : Service(),View.OnTouchListener,View.OnClickListener {
 
     private var wm: WindowManager? = null
     private var mJoystickContainerView: View? = null
-    // private var mJoystickView: JoystickView? = null
+    private var mJoystickView: JoystickView? = null
     private var mJoystickLayoutParams: WindowManager.LayoutParams? = null
     private var lat : Double = PrefManager.getLat
     private var lon : Double = PrefManager.getLng
@@ -27,8 +27,8 @@ class JoystickService : Service(),View.OnTouchListener,View.OnClickListener {
         wm =  getSystemService(WINDOW_SERVICE) as WindowManager
         val mInflater :LayoutInflater = getSystemService(Context.LAYOUT_INFLATER_SERVICE) as LayoutInflater
         mJoystickContainerView = mInflater.inflate(R.layout.joystick, null as ViewGroup?) as View
-        // mJoystickView = mJoystickContainerView!!.findViewById(R.id.joystickView_right)
-        /*
+        mJoystickView = mJoystickContainerView!!.findViewById(R.id.joystickView_right)
+        
         mJoystickView?.setOnTouchListener { v, event ->
             if (event.action == 1){
                 try {
@@ -56,7 +56,7 @@ class JoystickService : Service(),View.OnTouchListener,View.OnClickListener {
                 e.printStackTrace()
             }
         }
-        */
+        
         mJoystickLayoutParams = WindowManager.LayoutParams(
             WindowManager.LayoutParams.WRAP_CONTENT,
             WindowManager.LayoutParams.WRAP_CONTENT,

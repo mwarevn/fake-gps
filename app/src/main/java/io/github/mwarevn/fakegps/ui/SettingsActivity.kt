@@ -114,6 +114,8 @@ class ActivitySettings : AppCompatActivity() {
         override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
             preferenceManager?.preferenceDataStore = SettingPreferenceDataStore()
             setPreferencesFromResource(R.xml.preferences, rootKey)
+            
+            findPreference<androidx.preference.SwitchPreferenceCompat>("check_update_enabled")?.isVisible = io.github.mwarevn.fakegps.BuildConfig.DEBUG
 
             findPreference<EditTextPreference>("accuracy_level")?.let {
                 it.summary = "${PrefManager.accuracy} m"

@@ -12,12 +12,15 @@ import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
 import io.github.mwarevn.fakegps.domain.model.LatLng
+import io.github.mwarevn.fakegps.domain.model.TrafficLightNode
 import io.github.mwarevn.fakegps.R
 import io.github.mwarevn.fakegps.ui.MapActivity
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import io.github.mwarevn.fakegps.domain.model.TrafficLightState
+import io.github.mwarevn.fakegps.domain.model.TrafficLightStatus
 
 class LocationService : Service() {
 
@@ -33,6 +36,15 @@ class LocationService : Service() {
     
     private val _isDriving = MutableStateFlow(false)
     val isDrivingFlow: StateFlow<Boolean> = _isDriving.asStateFlow()
+
+    private val _trafficLightState = MutableStateFlow(TrafficLightState())
+    val trafficLightStateFlow: StateFlow<TrafficLightState> = _trafficLightState.asStateFlow()
+
+    private val _isAutoLightEnabled = MutableStateFlow(false)
+    val isAutoLightEnabledFlow: StateFlow<Boolean> = _isAutoLightEnabled.asStateFlow()
+
+    private val _trafficLightPoints = MutableStateFlow<List<TrafficLightNode>>(emptyList())
+    val trafficLightPointsFlow: StateFlow<List<TrafficLightNode>> = _trafficLightPoints.asStateFlow()
 
     var currentRoutePoints: List<LatLng> = emptyList()
         private set
@@ -110,7 +122,7 @@ class LocationService : Service() {
         }
     }
 
-    private fun createDefaultNotification(status: String): Notification {
+    private fun createDefaultNotification(defaultStatus: String): Notification {
         val intent = Intent(this, MapActivity::class.java).apply { 
             flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP 
         }
@@ -121,13 +133,23 @@ class LocationService : Service() {
 
         val speedToShow = if (_isDriving.value) SpeedSyncManager.getActualSpeed() else currentSpeedKmh.toFloat()
 
+        var statusText = defaultStatus
+        if (_isDriving.value && !_isPaused.value) {
+            statusText = when (_trafficLightState.value.status) {
+                TrafficLightStatus.APPROACHING -> "Chuẩn bị dừng đèn đỏ..."
+                TrafficLightStatus.WAITING -> "Đang chờ đèn đỏ: ${_trafficLightState.value.remainingSeconds} giây"
+                TrafficLightStatus.PASSED -> "Đã qua giao lộ"
+                TrafficLightStatus.MOVING -> "Đang di chuyển"
+            }
+        }
+
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_fake_location)
             .setContentIntent(pendingIntent)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
-            .setContentTitle("Fake GPS: $status")
-            .setContentText("${status} | ${speedToShow.toInt()} km/h")
+            .setContentTitle("Fake GPS: $statusText")
+            .setContentText("$statusText | ${speedToShow.toInt()} km/h")
             .setProgress(100, currentProgressPercent, false)
             .addAction(if (_isPaused.value) R.drawable.ic_play else R.drawable.ic_pause, if (_isPaused.value) "Resume" else "Pause", pausePI)
             .addAction(R.drawable.ic_stop, "Stop", stopPI)
@@ -164,6 +186,21 @@ class LocationService : Service() {
         
         routeSimulator?.stop()
         routeSimulator = RouteSimulator(points, speedKmh, 300L, serviceScope)
+        routeSimulator?.isAutoLightEnabled = _isAutoLightEnabled.value
+        routeSimulator?.onTrafficLightUpdate = { state ->
+            _trafficLightState.value = state
+            serviceScope.launch(Dispatchers.Main) {
+                updateNotificationUI()
+            }
+        }
+        
+        serviceScope.launch {
+            routeSimulator?.let { sim ->
+                sim.trafficLightPoints.collect { points ->
+                    _trafficLightPoints.value = points
+                }
+            }
+        }
         
         startForegroundCompat("Start navigation")
         
@@ -225,6 +262,15 @@ class LocationService : Service() {
         SpeedSyncManager.setSavedSpeed(speedKmh.toFloat())
         routeSimulator?.setSpeed(speedKmh)
         updateNotificationUI()
+    }
+
+    fun setAutoLightEnabled(enabled: Boolean) {
+        _isAutoLightEnabled.value = enabled
+        routeSimulator?.isAutoLightEnabled = enabled
+    }
+
+    fun skipCurrentTrafficLight(location: LatLng? = null) {
+        routeSimulator?.skipCurrentTrafficLight(location)
     }
 
     private fun stopForegroundService() {

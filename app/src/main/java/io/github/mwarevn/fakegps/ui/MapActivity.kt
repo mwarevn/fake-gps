@@ -31,6 +31,8 @@ import io.github.mwarevn.fakegps.R
 import io.github.mwarevn.fakegps.domain.map.IMapController
 import io.github.mwarevn.fakegps.domain.model.LatLng
 import io.github.mwarevn.fakegps.domain.model.VehicleType
+import io.github.mwarevn.fakegps.domain.model.TrafficLightState
+import io.github.mwarevn.fakegps.domain.model.TrafficLightStatus
 import com.mapbox.geojson.Point
 import com.mapbox.maps.CameraOptions
 import com.mapbox.maps.MapView
@@ -98,6 +100,7 @@ class MapActivity : BaseMapActivity() {
     private var traveledDistanceKm = 0.0
     private var lastDistancePosition: LatLng? = null
     private var hasSelectedStartPoint = false
+    private var lastClosestIndex = 0
 
     private var locationService: LocationService? = null
     private var isBound = false
@@ -130,6 +133,8 @@ class MapActivity : BaseMapActivity() {
                 val service = locationService ?: return@repeatOnLifecycle
                 launch { service.isPausedFlow.collect { paused -> isPaused = paused; updateNavControlButtons() } }
                 launch { service.isDrivingFlow.collect { driving -> if (isDriving && !driving) { onNavigationComplete() }; isDriving = driving; updateMarkersDraggableState() } }
+                launch { service.trafficLightStateFlow.collect { state -> updateTrafficLightUI(state) } }
+                launch { service.trafficLightPointsFlow.collect { points -> mapController.drawGlobalTrafficLightLabels(points) { clickedLocation -> locationService?.skipCurrentTrafficLight(clickedLocation) } } }
             }
         }
     }
@@ -274,11 +279,12 @@ class MapActivity : BaseMapActivity() {
         map.scalebar.enabled = false
         val polylineAnnotationManager = map.annotations.createPolylineAnnotationManager()
         val pointAnnotationManager = map.annotations.createPointAnnotationManager()
+        val viewAnnotationManager = map.viewAnnotationManager
         polylineAnnotationManager.lineCap = LineCap.ROUND; polylineAnnotationManager.lineJoin = LineJoin.ROUND
         
         mapController = io.github.mwarevn.fakegps.data.map.MapboxController(
-            map, mapboxMap, pointAnnotationManager, polylineAnnotationManager,
-            io.github.mwarevn.fakegps.data.map.MapboxController.MapIcons(getBitmapFromDrawable(R.drawable.ic_fake_location), getBitmapFromDrawable(R.drawable.ic_fake_gps_marker), getBitmapFromDrawable(R.drawable.ic_location_on))
+            map, mapboxMap, pointAnnotationManager, polylineAnnotationManager, viewAnnotationManager,
+            io.github.mwarevn.fakegps.data.map.MapboxController.MapIcons(getBitmapFromDrawable(R.drawable.ic_fake_location), getBitmapFromDrawable(R.drawable.ic_fake_gps_marker), getBitmapFromDrawable(R.drawable.ic_location_on), getBitmapFromDrawable(R.drawable.ic_traffic_light))
         )
         map.location.enabled = true
         mapboxMap.addOnMapClickListener { point -> onMapClick(LatLng(point.latitude(), point.longitude())); true }
@@ -343,6 +349,7 @@ class MapActivity : BaseMapActivity() {
             service.lastPosition?.let { handleNavigationUpdate(it) }
             totalRouteDistanceKm = calculateTotalRouteDistance(routingPoints); traveledDistanceKm = (completedPathPoints.size * 0.005); updateDistanceLabel()
             updateMarkersDraggableState()
+            binding.autoTrafficLightSwitch.isChecked = service.isAutoLightEnabledFlow.value
         }
     }
 
@@ -351,7 +358,13 @@ class MapActivity : BaseMapActivity() {
         if (Math.abs(currentLat - lastJoystickLat) > 1e-7 || Math.abs(currentLon - lastJoystickLon) > 1e-7) {
             lastJoystickLat = currentLat; lastJoystickLon = currentLon
             val newPos = LatLng(currentLat, currentLon)
-            lifecycleScope.launch(Dispatchers.Main) { currentFakeLocationPos = newPos; updateActionButtonsVisibility() }
+            lifecycleScope.launch(Dispatchers.Main) { 
+                currentFakeLocationPos = newPos
+                updateActionButtonsVisibility()
+                if (isGpsSet) {
+                    updateFakeLocationMarker(newPos)
+                }
+            }
         }
     }
 
@@ -407,6 +420,8 @@ class MapActivity : BaseMapActivity() {
         binding.speedSlider.addOnChangeListener { _, value, fromUser -> if (fromUser) { currentSpeed = if (isDriving && value <= 0) 1.0 else value.toDouble(); updateSpeedLabel(currentSpeed); locationService?.setSpeed(currentSpeed) } }
         binding.autoCurveSpeedCheckbox.isChecked = PrefManager.autoCurveSpeed
         binding.autoCurveSpeedCheckbox.setOnCheckedChangeListener { _, isChecked -> PrefManager.autoCurveSpeed = isChecked }
+        binding.autoTrafficLightSwitch.setOnCheckedChangeListener { _, isChecked -> locationService?.setAutoLightEnabled(isChecked) }
+        binding.skipTrafficLightButton.setOnClickListener { locationService?.skipCurrentTrafficLight() }
         binding.pauseButton.setOnClickListener { if (isDriving && !isPaused) locationService?.pauseSimulation() }
         binding.resumeButton.setOnClickListener { if (isDriving && isPaused) locationService?.resumeSimulation() }
         binding.stopButton.setOnClickListener { if (isDriving) onStopNavigationEarly() }
@@ -576,16 +591,74 @@ class MapActivity : BaseMapActivity() {
         binding.searchCard.visibility = View.GONE; binding.swapButtonContainer.visibility = View.GONE; binding.getFakeLocation.visibility = View.GONE; binding.setLocationButton.visibility = View.GONE; binding.replaceLocationButton.visibility = View.GONE
         updateNavigationAddresses(); updateNavControlButtons(); isCameraFollowing = true; binding.cameraFollowToggle.visibility = View.VISIBLE; updateCameraFollowButton()
         totalRouteDistanceKm = calculateTotalRouteDistance(routingPoints); traveledDistanceKm = 0.0; lastDistancePosition = null; updateDistanceLabel(); updateMarkersDraggableState()
+        lastClosestIndex = 0
         Intent(this, LocationService::class.java).apply { action = LocationService.ACTION_START_FOREGROUND }.also { startService(it) }
         locationService?.startRouteSimulation(points = routingPoints, speedKmh = currentSpeed, onPosition = { pos -> runOnUiThread { handleNavigationUpdate(pos) } }, onComplete = { runOnUiThread { onNavigationComplete() } })
     }
 
+    private var smoothAnimator: android.animation.ValueAnimator? = null
+
     private fun handleNavigationUpdate(pos: LatLng) {
         val time = System.currentTimeMillis(); currentNavigationPosition = pos; updateTraveledDistance(pos); updateSpeedLabel(currentSpeed)
-        if (PrefManager.isShowFakeIcon) updateFakeLocationMarker(pos)
+        
+        val startPos = currentFakeLocationPos ?: pos
+        smoothAnimator?.cancel()
+        smoothAnimator = android.animation.ValueAnimator.ofFloat(0f, 1f).apply {
+            duration = 300
+            interpolator = android.view.animation.LinearInterpolator()
+            addUpdateListener { animator ->
+                val fraction = animator.animatedFraction
+                val interpolatedLat = startPos.latitude + (pos.latitude - startPos.latitude) * fraction
+                val interpolatedLng = startPos.longitude + (pos.longitude - startPos.longitude) * fraction
+                val interpolatedPos = LatLng(interpolatedLat, interpolatedLng)
+                
+                if (PrefManager.isShowFakeIcon) updateFakeLocationMarker(interpolatedPos, moveCamera = false)
+            }
+            start()
+        }
         updateCompletedPath(pos)
-        if (isCameraFollowing && time - lastCameraUpdateTime >= CAMERA_UPDATE_INTERVAL_MS) { mapboxMap.easeTo(CameraOptions.Builder().center(Point.fromLngLat(pos.longitude, pos.latitude)).build()); lastCameraUpdateTime = time }
+
+        if (isCameraFollowing && time - lastCameraUpdateTime >= CAMERA_UPDATE_INTERVAL_MS) { 
+            val currentZoom = mapboxMap.cameraState.zoom
+            val mapAnimationOptions = com.mapbox.maps.plugin.animation.MapAnimationOptions.mapAnimationOptions { duration(CAMERA_UPDATE_INTERVAL_MS) }
+            mapboxMap.easeTo(CameraOptions.Builder().center(Point.fromLngLat(pos.longitude, pos.latitude)).zoom(currentZoom).build(), mapAnimationOptions)
+            lastCameraUpdateTime = time 
+        }
         previousLocation = pos
+    }
+
+    private fun updateTrafficLightUI(state: TrafficLightState) {
+        if (!isDriving) {
+            binding.trafficLightContainer.visibility = View.GONE
+            mapController.clearAllTrafficLightLabels()
+            return
+        }
+        
+        // Show map label as long as there is an anticipated location
+        if (state.lightPosition != null) {
+            mapController.showTrafficLightLabel(state.lightPosition, state.remainingSeconds) { locationService?.skipCurrentTrafficLight() }
+        }
+        
+        when (state.status) {
+            TrafficLightStatus.MOVING -> {
+                binding.trafficLightContainer.visibility = View.GONE
+            }
+            TrafficLightStatus.PASSED -> {
+                binding.trafficLightContainer.visibility = View.GONE
+                // After passing, ensure it's removed from map
+                state.lightPosition?.let { mapController.removeTrafficLightLabelAt(it) }
+            }
+            TrafficLightStatus.APPROACHING -> {
+                binding.trafficLightContainer.visibility = View.VISIBLE
+                binding.trafficLightStatusText.text = "Chuẩn bị dừng đèn đỏ"
+                binding.skipTrafficLightButton.visibility = if (state.canSkip) View.VISIBLE else View.GONE
+            }
+            TrafficLightStatus.WAITING -> {
+                binding.trafficLightContainer.visibility = View.VISIBLE
+                binding.trafficLightStatusText.text = "Đang chờ đèn đỏ: ${state.remainingSeconds} giây"
+                binding.skipTrafficLightButton.visibility = if (state.canSkip) View.VISIBLE else View.GONE
+            }
+        }
     }
 
     private fun updateNavigationAddresses() { lifecycleScope.launch { val sPos = mapController.getStartPosition(); val dPos = mapController.getDestinationPosition(); if (sPos != null && dPos != null) { binding.navFromAddress.text = "• ${getAddressFromLocation(sPos)}"; binding.navToAddress.text = "• ${getAddressFromLocation(dPos)}" } } }
@@ -606,15 +679,42 @@ class MapActivity : BaseMapActivity() {
 
     private fun updateReplaceLocationButtonVisibility() { val destPos = mapController.getDestinationPosition(); binding.replaceLocationButton.visibility = if (currentMode == AppMode.SEARCH && isGpsSet && destPos != null && currentFakeLocationPos != destPos) View.VISIBLE else View.GONE }
 
-    private fun updateFakeLocationMarker(position: LatLng) { currentFakeLocationPos = position; if (!PrefManager.isShowFakeIcon) { mapController.updateFakeLocationMarker(position, false); return }; mapController.updateFakeLocationMarker(position, true); if (isCameraFollowing && isDriving) mapController.moveCamera(position, animate = true) }
+    private fun updateFakeLocationMarker(position: LatLng, moveCamera: Boolean = true) { currentFakeLocationPos = position; if (!PrefManager.isShowFakeIcon) { mapController.updateFakeLocationMarker(position, false); return }; mapController.updateFakeLocationMarker(position, true); if (moveCamera && isCameraFollowing && isDriving) mapController.moveCamera(position, animate = true) }
 
-    private fun restoreFakeLocationMarker() { if (isGpsSet) updateFakeLocationMarker(LatLng(PrefManager.getLat, PrefManager.getLng)) else mapController.updateFakeLocationMarker(LatLng(0.0, 0.0), false); updateSetLocationButton() }
+    private fun restoreFakeLocationMarker() { if (isGpsSet) updateFakeLocationMarker(LatLng(PrefManager.getLat, PrefManager.getLng), moveCamera = false) else mapController.updateFakeLocationMarker(LatLng(0.0, 0.0), false); updateSetLocationButton() }
 
-    override fun onShowFakeIconToggled(show: Boolean) { if (!show) mapController.updateFakeLocationMarker(currentFakeLocationPos ?: LatLng(0.0, 0.0), false) else (if (isDriving) currentNavigationPosition else currentFakeLocationPos)?.let { updateFakeLocationMarker(it) }; updateSetLocationButton() }
+    override fun onShowFakeIconToggled(show: Boolean) { if (!show) mapController.updateFakeLocationMarker(currentFakeLocationPos ?: LatLng(0.0, 0.0), false) else (if (isDriving) currentNavigationPosition else currentFakeLocationPos)?.let { updateFakeLocationMarker(it, moveCamera = false) }; updateSetLocationButton() }
 
     private fun drawCompletedPathLocally() { if (completedPathPoints.isNotEmpty()) mapController.drawCompletedPath(completedPathPoints, COMPLETED_ROUTE_COLOR, ROUTE_WIDTH + 1.0) }
 
-    private fun updateCompletedPath(pos: LatLng) { if (completedPathPoints.isEmpty() || distanceBetween(completedPathPoints.last(), pos) >= 5.0) { completedPathPoints.add(pos); if (completedPathPoints.size % 3 == 0) mapController.drawCompletedPath(completedPathPoints, COMPLETED_ROUTE_COLOR, ROUTE_WIDTH + 1.0) } }
+    private fun updateCompletedPath(pos: LatLng) { 
+        if (routingPoints.isEmpty()) return
+        
+        var closestIndex = lastClosestIndex
+        var minDistance = if (lastClosestIndex < routingPoints.size) distanceBetween(pos, routingPoints[lastClosestIndex]) else Double.MAX_VALUE
+        
+        // Search slightly forward to follow the path without O(N) full array scan
+        val maxForward = Math.min(routingPoints.size - 1, lastClosestIndex + 100)
+        for (i in lastClosestIndex + 1 .. maxForward) {
+            val d = distanceBetween(pos, routingPoints[i])
+            if (d < minDistance) {
+                minDistance = d
+                closestIndex = i
+            }
+        }
+        
+        lastClosestIndex = closestIndex
+        
+        // Build the completed path by truncating exactly at the closest point
+        completedPathPoints.clear()
+        completedPathPoints.addAll(routingPoints.subList(0, closestIndex + 1))
+        
+        // Add the exact current location as the last continuous point
+        completedPathPoints.add(pos)
+        
+        // Redraw only occasionally to save resources or rely on hardware acceleration
+        mapController.drawCompletedPath(completedPathPoints, COMPLETED_ROUTE_COLOR, ROUTE_WIDTH + 1.0)
+    }
 
     private fun updateCameraFollowButton() { binding.cameraFollowToggle.setImageResource(if (isCameraFollowing) R.drawable.ic_camera_follow else R.drawable.ic_camera_free) }
     private fun distanceBetween(p1: LatLng, p2: LatLng): Double { val results = FloatArray(1); android.location.Location.distanceBetween(p1.latitude, p1.longitude, p2.latitude, p2.longitude, results); return results[0].toDouble() }
@@ -638,10 +738,13 @@ class MapActivity : BaseMapActivity() {
         routingPoints = emptyList()
         
         mapController.clearRoute(); mapController.clearStartMarker(); mapController.clearDestinationMarker()
+        mapController.clearAllTrafficLightLabels()
+        
         completedPathPoints.clear(); currentMode = AppMode.SEARCH; hasSelectedStartPoint = false
         currentStartPos = null; currentDestPos = null; currentNavigationPosition = null
         
         binding.actionButton.visibility = View.GONE; binding.navigationControlsCard.visibility = View.GONE; binding.cameraFollowToggle.visibility = View.GONE
+        binding.trafficLightContainer.visibility = View.GONE
         binding.completionActionsCard.visibility = View.GONE; binding.startSearchContainer.visibility = View.GONE; binding.useCurrentLocationContainer.visibility = View.GONE
         binding.cancelRouteButton.visibility = View.GONE
         binding.destinationSearch.text.clear(); binding.startSearch.text.clear(); binding.searchCard.visibility = View.VISIBLE
@@ -668,5 +771,19 @@ class MapActivity : BaseMapActivity() {
     private fun toggleNavigationControls() { val expanded = !PrefManager.navControlsExpanded; PrefManager.navControlsExpanded = expanded; binding.navControlsExpandable.visibility = if (expanded) View.VISIBLE else View.GONE; binding.navControlsToggle.setImageResource(if (expanded) R.drawable.ic_expand_less else R.drawable.ic_expand_more) }
     private fun restoreNavigationControlsState() { val expanded = PrefManager.navControlsExpanded; binding.navControlsExpandable.visibility = if (expanded) View.VISIBLE else View.GONE; binding.navControlsToggle.setImageResource(if (expanded) R.drawable.ic_expand_less else R.drawable.ic_expand_more) }
 
-    private fun getBitmapFromDrawable(resId: Int): Bitmap { val drawable = ContextCompat.getDrawable(this, resId); return if (drawable is BitmapDrawable) drawable.bitmap else { val bitmap = Bitmap.createBitmap(drawable!!.intrinsicWidth, drawable.intrinsicHeight, Bitmap.Config.ARGB_8888); val canvas = Canvas(bitmap); drawable.setBounds(0, 0, canvas.width, canvas.height); drawable.draw(canvas); bitmap } }
+    private fun getBitmapFromDrawable(resId: Int): Bitmap {
+        val drawable = ContextCompat.getDrawable(this, resId) ?: return Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888)
+        if (drawable is BitmapDrawable) {
+            return drawable.bitmap
+        }
+        val bitmap = Bitmap.createBitmap(
+            drawable.intrinsicWidth.takeIf { it > 0 } ?: 100,
+            drawable.intrinsicHeight.takeIf { it > 0 } ?: 100,
+            Bitmap.Config.ARGB_8888
+        )
+        val canvas = Canvas(bitmap)
+        drawable.setBounds(0, 0, canvas.width, canvas.height)
+        drawable.draw(canvas)
+        return bitmap
+    }
 }

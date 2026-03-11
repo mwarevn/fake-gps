@@ -61,6 +61,8 @@ abstract class BaseMapActivity: AppCompatActivity() {
     private val notificationsChannel by lazy { NotificationsChannel() }
     private val favListAdapter = FavListAdapter()
     private var xposedDialog: AlertDialog? = null
+    private var updateDialogInstance: AlertDialog? = null
+    private var downloadDialogInstance: AlertDialog? = null
     protected lateinit var fusedLocationClient: FusedLocationProviderClient
     
     protected val PERMISSION_ID = 42
@@ -213,6 +215,7 @@ abstract class BaseMapActivity: AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         viewModel.updateXposedState()
+        viewModel.checkForUpdates()
     }
 
     protected fun aboutDialog(){
@@ -299,29 +302,37 @@ abstract class BaseMapActivity: AppCompatActivity() {
     }
 
     private fun updateDialog(){
-        MaterialAlertDialogBuilder(this)
+        if (updateDialogInstance?.isShowing == true || downloadDialogInstance?.isShowing == true) return
+        
+        updateDialogInstance = MaterialAlertDialogBuilder(this)
             .setTitle(R.string.update_available)
             .setMessage(viewModel.getAvailableUpdate()?.changelog)
+            .setCancelable(BuildConfig.DEBUG)
             .setPositiveButton(getString(R.string.update_button)) { _, _ ->
                 showDownloadProgressDialog()
             }
-            .setNegativeButton("Để sau", null)
+            .setNegativeButton("Thoát") { _, _ ->
+                if (!BuildConfig.DEBUG) finishAffinity()
+            }
             .show()
     }
 
     private fun showDownloadProgressDialog() {
+        if (downloadDialogInstance?.isShowing == true) return
+        
         val view = layoutInflater.inflate(R.layout.update_dialog, null)
         val progress = view.findViewById<LinearProgressIndicator>(R.id.update_download_progress)
         val cancel = view.findViewById<AppCompatButton>(R.id.update_download_cancel)
         
-        val downloadDialog = MaterialAlertDialogBuilder(this)
+        downloadDialogInstance = MaterialAlertDialogBuilder(this)
             .setView(view)
-            .setCancelable(false)
+            .setCancelable(BuildConfig.DEBUG)
             .create()
             
         cancel.setOnClickListener {
             viewModel.cancelDownload(getActivityInstance())
-            downloadDialog.dismiss()
+            downloadDialogInstance?.dismiss()
+            if (!BuildConfig.DEBUG) finishAffinity()
         }
         
         lifecycleScope.launch {
@@ -337,11 +348,12 @@ abstract class BaseMapActivity: AppCompatActivity() {
                         is MainViewModel.State.Done -> {
                             viewModel.openPackageInstaller(getActivityInstance(), it.fileUri)
                             viewModel.clearUpdate()
-                            downloadDialog.dismiss()
+                            downloadDialogInstance?.dismiss()
                         }
                         is MainViewModel.State.Failed -> {
                             showToast(getString(R.string.bs_update_download_failed))
-                            downloadDialog.dismiss()
+                            downloadDialogInstance?.dismiss()
+                            if (!BuildConfig.DEBUG) finishAffinity()
                         }
                         else -> {}
                     }
@@ -349,7 +361,7 @@ abstract class BaseMapActivity: AppCompatActivity() {
             }
         }
         viewModel.getAvailableUpdate()?.let { viewModel.startDownload(getActivityInstance(), it) }
-        downloadDialog.show()
+        downloadDialogInstance?.show()
     }
 
     protected fun showStartNotification(address: String){

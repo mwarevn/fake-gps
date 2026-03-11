@@ -13,16 +13,17 @@ fi
 
 VERSION_NAME="${VERSION_STRING#v}"
 IFS='.' read -r MAJOR MINOR PATCH <<< "$VERSION_NAME"
-VERSION_CODE=$((MAJOR * 100 + MINOR * 10 + PATCH))
+# Sử dụng hệ số nhân lớn hơn (10000 và 100) để tránh trùng lặp Version Code khi Minor/Patch vượt quá 9
+VERSION_CODE=$((MAJOR * 10000 + MINOR * 100 + PATCH))
 
 echo "Releasing in 4s..."
 echo "- versionName: $VERSION_NAME"
 echo "- versionCode: $VERSION_CODE"
 sleep 4
 
-# Update version in build.gradle
-sed -i '' "s/def tagName = '.*'/def tagName = '$VERSION_NAME'/" app/build.gradle
-sed -i '' "s/versionCode [0-9]*/versionCode $VERSION_CODE/" app/build.gradle
+# Update version in build.gradle (Sửa cú pháp sed cho phù hợp với Linux thay vì macOS)
+sed -i "s/def tagName = '.*'/def tagName = '$VERSION_NAME'/" app/build.gradle
+sed -i "s/versionCode [0-9]*/versionCode $VERSION_CODE/" app/build.gradle
 
 # Build release APK (No flavor, just release)
 echo "Building release APK..."

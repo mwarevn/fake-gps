@@ -1,6 +1,7 @@
 package io.github.mwarevn.fakegps.domain.map
 
 import io.github.mwarevn.fakegps.domain.model.LatLng
+import io.github.mwarevn.fakegps.domain.model.TrafficLightNode
 
 /**
  * Interface for abstraction of Map providers (Mapbox, Google Maps, etc.)
@@ -8,7 +9,7 @@ import io.github.mwarevn.fakegps.domain.model.LatLng
 interface IMapController {
     
     // Core Map interactions
-    fun moveCamera(position: LatLng, zoom: Double = 15.0, animate: Boolean = true)
+    fun moveCamera(position: LatLng, zoom: Double? = null, animate: Boolean = true)
     fun loadStyle(styleUri: String, onComplete: () -> Unit)
     fun addOnCameraChangeListener(listener: (Double) -> Unit)
     
@@ -41,4 +42,10 @@ interface IMapController {
     // Permissions & State
     fun checkPermissions(): Boolean
     fun requestPermissions()
+
+    // Traffic Light Overlay
+    fun showTrafficLightLabel(position: LatLng, seconds: Int, onSkipClick: () -> Unit)
+    fun drawGlobalTrafficLightLabels(points: List<TrafficLightNode>, onSkipClick: (LatLng) -> Unit)
+    fun removeTrafficLightLabelAt(position: LatLng)
+    fun clearAllTrafficLightLabels()
 }

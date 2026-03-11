@@ -222,19 +222,43 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:orientation="horizontal"
-                        android:gravity="center_vertical">
-                        <com.google.android.material.checkbox.MaterialCheckBox
+                        android:gravity="center_vertical"
+                        android:layout_marginTop="4dp"
+                        android:layout_marginBottom="4dp">
+                        <com.google.android.material.materialswitch.MaterialSwitch
                             android:id="@+id/auto_curve_speed_checkbox"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="Giảm tốc góc cua"
+                            android:textSize="12sp"
+                            android:layout_marginEnd="8dp"/>
+                        <com.google.android.material.materialswitch.MaterialSwitch
+                            android:id="@+id/auto_traffic_light_switch"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="Dừng đèn đỏ"
+                            android:textSize="12sp" />
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical">
+                        <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="Auto"
-                            android:textSize="11sp"
-                            android:minHeight="0dp"
-                            android:minWidth="0dp"/>
+                            android:text="Tốc độ"
+                            android:textSize="12sp"
+                            android:textColor="?attr/colorOnSurfaceVariant"
+                            android:layout_marginEnd="8dp"/>
                         <com.google.android.material.slider.Slider
                             android:id="@+id/speed_slider"
-                            android:layout_width="match_parent"
+                            android:layout_width="0dp"
                             android:layout_height="wrap_content"
+                            android:layout_weight="1"
                             android:valueFrom="0"
                             android:valueTo="400"
                             app:labelBehavior="gone"/>
@@ -287,6 +311,38 @@
                             app:iconTint="?attr/colorError"
                             app:icon="@drawable/ic_stop"
                             app:iconSize="16dp"/>
+                    </LinearLayout>
+
+                    <!-- Traffic Light Status -->
+                    <LinearLayout
+                        android:id="@+id/traffic_light_container"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical"
+                        android:layout_marginTop="8dp"
+                        android:visibility="gone"
+                        android:background="?attr/colorErrorContainer"
+                        android:paddingHorizontal="12dp"
+                        android:paddingVertical="4dp">
+                        <TextView
+                            android:id="@+id/traffic_light_status_text"
+                            android:layout_width="0dp"
+                            android:layout_weight="1"
+                            android:layout_height="wrap_content"
+                            android:text="Đang chờ đèn đỏ: 15s"
+                            android:textColor="?attr/colorOnErrorContainer"
+                            android:textStyle="bold"
+                            android:textSize="13sp" />
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/skip_traffic_light_button"
+                            style="@style/Widget.Material3.Button.TextButton"
+                            android:layout_width="wrap_content"
+                            android:layout_height="40dp"
+                            android:text="Bỏ qua"
+                            android:textColor="?attr/colorOnErrorContainer"
+                            android:insetTop="0dp"
+                            android:insetBottom="0dp" />
                     </LinearLayout>
                 </LinearLayout>
             </LinearLayout>
