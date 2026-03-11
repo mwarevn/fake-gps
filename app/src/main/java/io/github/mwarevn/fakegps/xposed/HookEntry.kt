@@ -42,5 +42,19 @@ class HookEntry : IXposedHookLoadPackage {
         } catch (e: Throwable) {
             XposedBridge.log("GPS Setter: Failed to init SensorHook for ${lpparam.packageName}: ${e.message}")
         }
+
+        // 4. Khởi tạo Hook mạng (WiFi, Bluetooth, Cell tower, System settings)
+        try {
+            NetworkHook.initHooks(lpparam)
+        } catch (e: Throwable) {
+            XposedBridge.log("GPS Setter: Failed to init NetworkHook for ${lpparam.packageName}: ${e.message}")
+        }
+
+        // 5. Khởi tạo Hook Geocoder (reverse geocoding spoofing)
+        try {
+            GeocoderHook.initHooks(lpparam)
+        } catch (e: Throwable) {
+            XposedBridge.log("GPS Setter: Failed to init GeocoderHook for ${lpparam.packageName}: ${e.message}")
+        }
     }
 }

@@ -46,4 +46,11 @@
 - **Detection:** Tự động quét phiên bản mới 
 - **Probability:** khi user mở app / onresume thì quét link github release lấy file yml mới nhất check với phiên bản hiện tại, nếu không có bản mới thì không làm gì. nếu có bản mới thì bắt buộc user phải update app mới có thể sử dụng được app (hiện dialog yêu cầu update) nhấn update mở link download file. nhấn cancel thì thoát app.
 - **Attention** Hiện tại app đã có sẵn tính năng check update. hãy comment lại cái nút toggle bật tắt update để khi tôi dev còn tắt được tính năng này. xử lý sao cho không để các cửa sổ báo update chồng lặp lên nhau nhiều lần.
- 
+
+
+
+ # Feature: Anti-detection
+## 1. Logic & Mathematical Rules
+- **Detection:** Tự động fake các trạng thái để tránh các app hoặc hệ thống phát hiện ra vị trí tương đối hoặc tuyệt đối thật.
+- **Probability:** Khi user fake gps thì fake các thông tin như. Google location accuracy, Geocoder spoofing, sensor spoofing, giả các thoogn tin mạng như: Wifi scan block, bluetooth spoffing, cell tower spoofing , các cài đặt hệ thống như: quét tìm wifi, quét tìm bluetooth, giám sát real-time xem có app nào đang truy cập vào vị trí, hiện notify nhỏ gồm tên và icon của ứng dụng đang dùng vị trí và nút dừng để tắt ứng dụng truy cập vị trí.
+- **Attention** Hiện tại app đã có sẵn tính năng này nhưng chưa tính năng nào trong anti-detection hoạt động cả. hãy deep research để nghiên cứu cách làm nó hoạt động. gắn nhãn cho anti-detection là [beta].
