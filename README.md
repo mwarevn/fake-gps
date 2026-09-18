@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="https://appteka.store/get/e2Up1_EuDKFD0waaQl8JO6XM-wyltVOoAoApheveMlNnVjR8a0kCaw0yzYrynb3hDG_bXNowZQv41fWBWe_HRonr-A==/820e855e9fa3b83fc5b305aa545b569d84efa8ee.png" alt="Fake GPS Logo" width="100"/>
+  <img src="https://raw.githubusercontent.com/mwarevn/fake-gps/refs/heads/release/app-icon.png" alt="Fake GPS mwarevn" width="100"/>
 
   # 🚀 Fake GPS: Advanced Navigation & Joystick
 
