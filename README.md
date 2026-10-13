@@ -16,7 +16,7 @@
 
 ---
 
-## 🎬 Demo / Videos & Screenshots (Click to see)
+## 🎬 Demo / Videos & Screenshots (Click to view demo)
 
 <div align="center">
 
@@ -27,19 +27,19 @@
           <img src="https://pub-a052aef593f24fe69f2aed2f3b80118f.r2.dev/demolightcover.jpg" width="100%"/>
        </a>
       <br/>
-      <sub><b>Demo 1</b> - Route Navigation</sub>
+      <sub><b>Demo</b> - Route Navigation</sub>
     </td>
     <td align="center" width="33%">
        <a href="https://pub-a052aef593f24fe69f2aed2f3b80118f.r2.dev/demodark.mp4">
           <img src="https://pub-a052aef593f24fe69f2aed2f3b80118f.r2.dev/demodarkcover.jpg" width="100%"/>
        </a>
       <br/>
-      <sub><b>Demo 2</b> — 3D Style</sub>
+      <sub><b>Demo</b> — 3D Style</sub>
     </td>
     <td align="center" width="33%">
       <img src="https://raw.githubusercontent.com/mwarevn/fake-gps/release/screenshot.jpg" width="100%"/>
       <br/>
-      <sub><b>Demo 3</b> — Drawer</sub>
+      <sub><b>Screenshot</b> — Drawer</sub>
     </td>
   </tr>
 </table>
