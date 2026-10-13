@@ -22,7 +22,7 @@
 
 <table>
   <tr>
-    <td align="center" width="33%">
+    <!-- <td align="center" width="33%">
       <img src="https://streamable.com/e/xk4hjo?autoplay=1&muted=1&nocontrols=1" width="100%"/>
       <br/>
       <sub><b>Demo 1</b> - Navigation</sub>
@@ -31,7 +31,7 @@
       <img src="https://raw.githubusercontent.com/mwarevn/fake-gps/release/demo-dark.gif" width="100%"/>
       <br/>
       <sub><b>Demo 2</b> — Route navigation</sub>
-    </td>
+    </td> -->
     <td align="center" width="33%">
       <img src="https://raw.githubusercontent.com/mwarevn/fake-gps/release/screenshot.jpg" width="100%"/>
       <br/>
