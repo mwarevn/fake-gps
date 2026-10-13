@@ -16,6 +16,34 @@
 
 ---
 
+## 🎬 Demo / Videos & Screenshots
+
+<div align="center">
+
+<table>
+  <tr>
+    <td align="center" width="33%">
+      <img src="https://streamable.com/e/xk4hjo?autoplay=1&muted=1&nocontrols=1" width="100%"/>
+      <br/>
+      <sub><b>Demo 1</b> - Navigation</sub>
+    </td>
+    <td align="center" width="33%">
+      <img src="https://raw.githubusercontent.com/mwarevn/fake-gps/release/demo-dark.gif" width="100%"/>
+      <br/>
+      <sub><b>Demo 2</b> — Route navigation</sub>
+    </td>
+    <td align="center" width="33%">
+      <img src="https://raw.githubusercontent.com/mwarevn/fake-gps/release/screenshot.jpg" width="100%"/>
+      <br/>
+      <sub><b>Demo 3</b> — Drawer</sub>
+    </td>
+  </tr>
+</table>
+
+</div>
+
+---
+
 ### 📌 Yêu cầu hệ thống / Prerequisites
 
 * **Android OS:** 8.0+
